@@ -63,7 +63,7 @@
             <div class="col-sm-4">
                 <div class="form-group">
                     <label for="cvv">CVV/CVC</label>
-                    <input class="form-control @error('ccv') is-invalid @enderror" value="{{ old('ccv') }}" id="cvv" type="text" placeholder="123" name="ccv">
+                    <input class="form-control @error('ccv') is-invalid @enderror" value="{{ old('ccv') }}" id="cvv" type="number" placeholder="123" name="ccv">
                      @error('ccv')
                         <div class="alert alert-danger">{{ $message }}</div>
                     @enderror

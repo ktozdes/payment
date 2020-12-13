@@ -28,7 +28,7 @@
         </div>
         <div class="col-4">
             <div class="card">
-                <form method="post" action="{{ route('payment.update', $item->id) }}">
+                <form method="post" action="{{ route('payment.front.update', $item->token) }}">
                 @csrf
                 <x-payment-card></x-payment-card>
                 </form>

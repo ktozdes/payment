@@ -21,6 +21,7 @@ Route::get('/', function () {
 Auth::routes();
 
 Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
+Route::get('/payment/show/{payment:token}', [PaymentController::class, 'show'])->name('payment.front.show');
 Route::get('/payment/{payment:token}', [PaymentController::class, 'edit'])->name('payment.front.edit');
 Route::post('/payment/{payment:token}', [PaymentController::class, 'update'])->name('payment.front.update');
 
@@ -32,7 +33,7 @@ Route::group(['prefix' => 'admin', 'middleware' => 'auth'], function () {
         Route::post('/store', [PaymentController::class, 'store'])->name('payment.store');
         Route::get('/edit/{payment}', [PaymentController::class, 'edit'])->name('payment.edit');
         Route::post('/update/{payment}', [PaymentController::class, 'update'])->name('payment.update');
-        Route::get('/destroy/{payment}', [PaymentController::class, 'destroy'])->name('payment.destroy');
+        Route::get('/finish/{payment}', [PaymentController::class, 'finish'])->name('payment.finish');
     });
 });
 

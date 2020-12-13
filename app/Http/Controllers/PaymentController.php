@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\PaymentFinished;
 use App\Models\Card;
 use App\Models\Payment;
 use Carbon\Carbon;
@@ -20,7 +21,8 @@ class PaymentController extends Controller
         //$searchFilter = [];
         $orderBy = isset($request->filter['sort_by']) ? :'payments.id';
         $query = Payment
-            ::with('card');
+            ::select(['payments.id as id', 'token', 'full_name', 'phone', 'email', 'payed_at', 'cards.type as type', 'amount'])
+            ->leftJoin('cards', 'cards.id', 'payments.card_id');
         if (isset($request->filter['token']) && !empty($request->filter['token'])) {
             $query->where('token', 'like', '%' . $request->filter['token'] . '%');
         }
@@ -28,13 +30,15 @@ class PaymentController extends Controller
             $query->where('full_name', 'like', '%' . $request->filter['full_name'] . '%');
         }
         if (isset($request->filter['card_type']) && !empty($request->filter['card_type'])) {
-            $query->where('cards.type', $request->filter['card_type'] );
+            $query->where('type', $request->filter['card_type'] );
         }
         $query->orderBy($orderBy, 'desc');
+        //echo $query->orderBy($orderBy, 'desc')->toSql();
         $items = $query->paginate( config('app.paginate_by', '25') )->onEachSide(2);
         return view('payment.index', [
             'items' => $items,
             'filters' => $request->filter,
+            'statuses' => $request->filter,
         ]);
     }
 
@@ -99,7 +103,7 @@ class PaymentController extends Controller
                 'histories' => $payment->histories()->orderBy('created_at', 'desc')->get(),
             ]);
         }
-        return redirect()->route('payment.show', $payment->id)->withError(__('Payment cannot be edited'));
+        return redirect()->route('payment.front.show', $payment->token)->withError(__('Payment cannot be edited'));
     }
 
     /**
@@ -115,6 +119,12 @@ class PaymentController extends Controller
             $request->validate([
                 'owner' => 'required',
                 'number' => ['required',
+                    function ($attribute, $value, $fail) {
+                        $value = preg_replace('/[^0-9.]+/', '', $value);
+                        if (strlen($value) != 16) {
+                            $fail(__('Card number has to be 16 digits'));
+                        }
+                    },
                     function ($attribute, $value, $fail) {
                         $value = preg_replace('/[^0-9.]+/', '', $value);
                         $length = strlen($value);
@@ -160,20 +170,19 @@ class PaymentController extends Controller
                 ],
                 'ccv' => 'required|numeric',
             ]);
+            $allRequests = $request->all();
+            $number = preg_replace('/[^0-9.]+/', '', $allRequests['number']);
+            $allRequests['number'] = substr($number, 0, 6) . '******' . substr($number, -4);
             $card = Card::create(
-                $request->all()
+                $allRequests
             );
-            print_r($request->all());
-            print_r($card->getAttributes());
             $payment->update([
                 'card_id' => $card->id,
                 'payed_at' => Carbon::now(),
             ]);
-            return redirect()->route('payment.show', $payment->id)->withSuccess(__('Payment is updated'));
+            return redirect()->route('payment.front.show', $payment->token)->withSuccess(__('Payment is updated'));
         }
-        return redirect()->route('payment.show', $payment->id)->withError(__('Payment cannot be edited'));
-
-
+        return redirect()->route('payment.front.show', $payment->token)->withError(__('Payment cannot be edited'));
     }
 
     /**
@@ -182,9 +191,13 @@ class PaymentController extends Controller
      * @param  \App\Models\Payment  $payment
      * @return \Illuminate\Http\Response
      */
-    public function destroy(Payment $payment)
+    public function finish(Payment $payment)
     {
-        //
+        if (!$payment->card && isset($payment->current_status) && $payment->current_status->code =='created') {
+            event(new PaymentFinished($payment));
+            return redirect()->route('payment.show', $payment->id)->withSuccess(__('Payment Finished'));
+        }
+        return redirect()->route('payment.show', $payment->id)->withError(__('Payment Not Finished'));
     }
     /**
      * Remove the specified resource from storage.

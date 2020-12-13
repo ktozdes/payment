@@ -40,6 +40,7 @@
                 <table class="table">
                     <thead class="thead-dark">
                         <tr>
+                            <th scope="col">{{ __('ID') }}</th>
                             <th scope="col">{{ __('Amount') }}</th>
                             <th scope="col">{{ __('Full name') }}</th>
                             <th scope="col">{{ __('Phone') }}</th>
@@ -52,17 +53,18 @@
                     <tbody>
                       @foreach ($items as $item)
                         <tr>
-                            <th scope="row">
-                                {{ $item->currency }}
-                            </th>
+                            <th scope="row">{{ $item->id }}</th>
+                            <th scope="row">{{ $item->currency }}</th>
                             <td>{{ $item->full_name }}</td>
                             <td>{{ $item->phone }}</td>
                             <td>{{ $item->email }}</td>
-                            <td>{{ $item->card->type }}</td>
+                            <td>{{ isset($item->type) ? $item->type: 'No card' }}</td>
                             <td>{{ isset($item->current_status) ? $item->current_status->name : 'No history' }}</td>
                             <td class="text-right">
+                                @if (isset($item->current_status) && $item->current_status->code == 'pending')
+                                <a href="{{ route('payment.finish', [$item->id]) }}" title="{{ __('Finish Payment') }}" class="btn btn-sm btn-success">{{ __('Finish Payment') }}</a>
+                                @endif
                                 <a href="{{ route('payment.show', [$item->id]) }}" title="{{ __('Show Payment') }}" class="btn btn-sm btn-info">{{ __('Show Payment') }}</a>
-                                <a href="{{ route('payment.edit', [$item->id]) }}" title="{{ __('Edit Payment') }}" class="btn btn-sm btn-secondary">{{ __('Edit Payment') }}</a>
                             </td>
                         </tr>
                       @endforeach

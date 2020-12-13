@@ -1,28 +1,13 @@
-@if (session('success_message'))
+@if (session('success'))
     <div class="alert alert-success alert-dismissible fade show">
-    	@foreach (session('success_message') as $message)
-        	{{ $message }}
-    	@endforeach
-    	<button type="button" class="close" data-dismiss="alert" aria-label="Close">
-			<span aria-hidden="true">&times;</span>
-		</button>
+    	{{session('success')}}
     </div>
-@elseif (session('warning_message'))
+@elseif (session('warning'))
     <div class="alert alert-warning alert-dismissible fade show">
-        @foreach (session('warning_message') as $message)
-            {{ $message }}
-        @endforeach
-        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-            <span aria-hidden="true">&times;</span>
-        </button>
+        {{session('warning')}}
     </div>
-@elseif (session('error_message'))
+@elseif (session('error'))
 	<div class="alert alert-danger alert-dismissible fade show">
-	    @foreach (session('error_message') as $message)
-        	{{ $message }}
-    	@endforeach
-    	<button type="button" class="close" data-dismiss="alert" aria-label="Close">
-			<span aria-hidden="true">&times;</span>
-		</button>
+	    {{session('error')}}
 	</div>
 @endif
