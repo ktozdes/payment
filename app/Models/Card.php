@@ -8,4 +8,5 @@ use Illuminate\Database\Eloquent\Model;
 class Card extends Model
 {
     use HasFactory;
+    protected $fillable = ['owner', 'number', 'expiration_date', 'type'];
 }

@@ -2,29 +2,51 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Card;
 use App\Models\Payment;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class PaymentController extends Controller
 {
     /**
      * Display a listing of the resource.
      *
-     * @return \Illuminate\Http\Response
+     * @return \Illuminate\Contracts\View\View|\Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
-        //
+        //$searchFilter = [];
+        $orderBy = isset($request->filter['sort_by']) ? :'payments.id';
+        $query = Payment
+            ::with('card');
+        if (isset($request->filter['token']) && !empty($request->filter['token'])) {
+            $query->where('token', 'like', '%' . $request->filter['token'] . '%');
+        }
+        if (isset($request->filter['full_name']) && !empty($request->filter['full_name'])) {
+            $query->where('full_name', 'like', '%' . $request->filter['full_name'] . '%');
+        }
+        if (isset($request->filter['card_type']) && !empty($request->filter['card_type'])) {
+            $query->where('cards.type', $request->filter['card_type'] );
+        }
+        $query->orderBy($orderBy, 'desc');
+        $items = $query->paginate( config('app.paginate_by', '25') )->onEachSide(2);
+        return view('payment.index', [
+            'items' => $items,
+            'filters' => $request->filter,
+        ]);
     }
 
     /**
      * Show the form for creating a new resource.
      *
-     * @return \Illuminate\Http\Response
+     * @return \Illuminate\Contracts\View\View|\Illuminate\Http\Response
      */
     public function create()
     {
-        //
+        return view('payment.create', [
+        ]);
     }
 
     /**
@@ -35,29 +57,49 @@ class PaymentController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        $request->validate([
+            'amount'=>'required',
+            'email' => 'nullable|email',
+        ]);
+        $payment = new Payment($request->all());
+        $payment->amount = floatval(preg_replace("/[^-0-9\.]/","",$request->amount));
+        $payment->token = $this->generateUniqueToken();
+        $payment->save();
+
+        return redirect()->route('payment.show', $payment->id)->withSuccess(__('Payment Created'));
     }
 
     /**
      * Display the specified resource.
      *
      * @param  \App\Models\Payment  $payment
-     * @return \Illuminate\Http\Response
+     * @return \Illuminate\Contracts\View\View|\Illuminate\Http\Response
      */
     public function show(Payment $payment)
     {
-        //
+        //$searchFilter = [];
+        $payment->load('card');
+        return view('payment.show', [
+            'item' => $payment,
+            'histories' => $payment->histories()->orderBy('created_at', 'desc')->get(),
+        ]);
     }
 
     /**
      * Show the form for editing the specified resource.
      *
      * @param  \App\Models\Payment  $payment
-     * @return \Illuminate\Http\Response
+     * @return \Illuminate\Contracts\View\View|\Illuminate\Http\Response
      */
     public function edit(Payment $payment)
     {
-        //
+        if (!$payment->card && isset($payment->current_status) && $payment->current_status->code =='created') {
+            return view('payment.edit', [
+                'item' => $payment,
+                'histories' => $payment->histories()->orderBy('created_at', 'desc')->get(),
+            ]);
+        }
+        return redirect()->route('payment.show', $payment->id)->withError(__('Payment cannot be edited'));
     }
 
     /**
@@ -69,7 +111,69 @@ class PaymentController extends Controller
      */
     public function update(Request $request, Payment $payment)
     {
-        //
+        if (!$payment->card && isset($payment->current_status) && $payment->current_status->code =='created') {
+            $request->validate([
+                'owner' => 'required',
+                'number' => ['required',
+                    function ($attribute, $value, $fail) {
+                        $value = preg_replace('/[^0-9.]+/', '', $value);
+                        $length = strlen($value);
+                        $sum = (int)$value[$length - 1];
+                        $parity = $length % 2;
+                        for ($index = 0; $index < $length - 1; $index++) {
+                            $digit = (int)$value[$index];
+                            if ($index % 2 == $parity) {
+                                $digit *= 2;
+                            }
+                            if ($digit > 9) {
+                                $digit -= 9;
+                            }
+                            $sum += $digit;
+                        }
+                        if (($sum % 10 != 0)) {
+                            $fail(__('Invalid card number'));
+                        }
+                    },
+                ],
+                'expiration_date' => ['required',
+                    function ($attribute, $value, $fail) {
+                        $values = explode('/', $value);
+                        if (isset($values[0]) && is_numeric($values[0]) && $values[0] > 0 && $values[0] < 13) {
+
+                            if (isset($values[1]) && is_numeric($values[1]) && $values[1] >= date("y") && $values[1] <= (date("y") + 5)) {
+                                try {
+                                    $cardDate = Carbon::createFromFormat('y-m-d H:i:s', "{$values[1]}-{$values[0]}-1 00:00:01");
+                                    $fiveYears = Carbon::now()->addYears(5);
+                                    if ($cardDate < Carbon::now() || $cardDate > $fiveYears) {
+                                        $fail(__('Invalid date'));
+                                    }
+                                } catch (\Carbon\Exceptions\InvalidDateException $exp) {
+                                    $fail(__('Invalid date'));
+                                }
+                            } else {
+                                $fail(__('Invalid year'));
+                            }
+                        } else {
+                            $fail(__('Invalid month'));
+                        }
+                    }
+                ],
+                'ccv' => 'required|numeric',
+            ]);
+            $card = Card::create(
+                $request->all()
+            );
+            print_r($request->all());
+            print_r($card->getAttributes());
+            $payment->update([
+                'card_id' => $card->id,
+                'payed_at' => Carbon::now(),
+            ]);
+            return redirect()->route('payment.show', $payment->id)->withSuccess(__('Payment is updated'));
+        }
+        return redirect()->route('payment.show', $payment->id)->withError(__('Payment cannot be edited'));
+
+
     }
 
     /**
@@ -81,5 +185,20 @@ class PaymentController extends Controller
     public function destroy(Payment $payment)
     {
         //
+    }
+    /**
+     * Remove the specified resource from storage.
+     *
+     * @param  \App\Models\Payment  $payment
+     * @return string
+     */
+    private function generateUniqueToken() {
+        $str = Str::random(100);
+        $payment = Payment::where('token', $str)->get();
+
+        if ( $payment->isEmpty() ) {
+            return $str;
+        }
+        return $this->generateUniqueToken();
     }
 }
