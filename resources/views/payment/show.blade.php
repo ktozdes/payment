@@ -18,7 +18,7 @@
                     <li class="list-group-item">{{ __('Phone') }}:  {{ $item->phone }}</li>
                     <li class="list-group-item">{{ __('Email') }}:  {{ $item->email }}</li>
                     <li class="list-group-item">{{ __('Payed At') }}:  {{ isset($item->payed_at) ? $item->payed_at->format('d/m/Y') : __('Not paid yet') }}</li>
-                    <li class="list-group-item">{{ __('Unique link') }}:  {{ $item->token }}</li>
+                    <li class="list-group-item">{{ __('Unique link') }}:  {{ 'http://localhost:8090/payment/' . $item->token }}</li>
                 </ul>
                 <div class="card-footer">
                     {{ __('Current Status') }}: {{ isset($item->current_status) ? $item->current_status->name : 'No history' }}<br/>
